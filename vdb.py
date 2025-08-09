@@ -3,7 +3,6 @@ from model import Model
 from typing import List, Optional
 from unstructured.partition.pdf import partition_pdf
 
-
 def split_text_into_chunks(text, chunk_size, overlap):
     """
     Split text into chunks with a specified size and overlap.
@@ -45,10 +44,11 @@ def mx_array_to_chunks(data: mx.array, lengths: mx.array) -> List[str]:
     i = 0
     output = []
     for l in lengths:
-        j = l.item() + i
+        l_int = int(l.item()) 
+        j = i + l_int
         x = [chr(d.item()) for d in data[i:j]]
         output.append("".join(x))
-        i = l.item()
+        i = j # When processing multiple PDFs the index is now updated
     return output
 
 
@@ -67,10 +67,21 @@ class VectorDB:
             except Exception as e:
                 raise Exception(f"failed with {e}")
 
+    # content is what will be sent to the LLM when a match is found
     def ingest(self, content: str) -> None:
         chunks = split_text_into_chunks(text=content, chunk_size=1000, overlap=200)
-        self.embeddings = self.model.run(chunks)
-        self.content = chunks
+
+        if not chunks:
+            raise ValueError("No content to ingest. Please provide valid text.")
+        
+        new_emb = self.model.run(chunks) # (n_chunks, d)
+
+        if self.embeddings is None:
+            self.embeddings = self.model.run(chunks)
+            self.content = chunks
+        else:
+            self.embeddings = mx.concat([self.embeddings, new_emb], axis=0)
+            self.content.extend(chunks)
 
     def query(self, text: str) -> str:
         query_emb = self.model.run(text)
@@ -93,4 +104,12 @@ def vdb_from_pdf(pdf_file: str) -> VectorDB:
     elements = partition_pdf(pdf_file)
     content = "\n\n".join([e.text for e in elements])
     model.ingest(content=content)
+    return model
+
+def vdb_from_pdf_dir(pdf_files: List[str]) -> VectorDB:
+    model = VectorDB()
+    for pdf_file in pdf_files:
+        elements = partition_pdf(pdf_file)
+        content = "\n\n".join([e.text for e in elements])
+        model.ingest(content=content)
     return model
