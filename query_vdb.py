@@ -3,14 +3,19 @@ from vdb import VectorDB
 from mlx_lm import load, generate
 from mlx_lm.sample_utils import make_sampler
 
-TEMPLATE = """You are a concise assistant for the Glasgow University Fencing Club.
-Use only the context to answer. Do NOT repeat the question or context. Answer in 2-4 sentences.
+TEMPLATE = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a chatbot that answers questions about fencing and the Glasgow University Fencing Club.
+You must ONLY answer questions about fencing, fencers or the Glasgow University Fencing Club.
+
+Use only the provided context when answering relevant questions.
+Do NOT repeat the question or context.
+Keep answers to one or two short paragraphs.<|eot_id|><|start_header_id|>user<|end_header_id|>
 
 Context:
 {context}
 
-Question: {question}
-Answer:
+Question: {question}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 """
 
 if __name__ == "__main__":
@@ -33,14 +38,12 @@ if __name__ == "__main__":
     m = VectorDB(args.vdb)
     context = m.query(args.question)
     prompt = TEMPLATE.format(context=context, question=args.question)
-    #model, tokenizer = load("mlx-community/NeuralBeagle14-7B-4bit-mlx")
-    model, tokenizer = load("mlx-community/Llama-3.2-1B-Instruct-4bit")
+    model, tokenizer = load("mlx-community/Llama-3.2-3B-Instruct-8bit")
     
     out = generate(
         model,
         tokenizer,
         prompt=prompt,
-        max_tokens=250,
+        max_tokens=350,
         verbose=True,
     )
-    print(out)

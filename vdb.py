@@ -17,6 +17,9 @@ def split_text_into_chunks(text, chunk_size, overlap):
     """
     if chunk_size <= 0 or overlap < 0:
         raise ValueError("Invalid chunk size or overlap value.")
+    if not text:
+        print("Warning: The input text is empty. Returning an empty list.")
+        return []
 
     chunks = []
     start = 0
@@ -69,7 +72,7 @@ class VectorDB:
 
     # content is what will be sent to the LLM when a match is found
     def ingest(self, content: str) -> None:
-        chunks = split_text_into_chunks(text=content, chunk_size=1000, overlap=200)
+        chunks = split_text_into_chunks(text=content, chunk_size=800, overlap=150)
 
         if not chunks:
             raise ValueError("No content to ingest. Please provide valid text.")
@@ -84,8 +87,13 @@ class VectorDB:
             self.content.extend(chunks)
 
     def query(self, text: str) -> str:
+        tolerance = 50
         query_emb = self.model.run(text)
         scores = mx.matmul(query_emb, self.embeddings.T) * 100
+        print("Max scores: ", mx.max(scores))
+        if mx.max(scores) < tolerance:
+            return "No relevant content found."
+        
         response = self.content[mx.argmax(scores).item()]
         return response
 
@@ -109,6 +117,7 @@ def vdb_from_pdf(pdf_file: str) -> VectorDB:
 def vdb_from_pdf_dir(pdf_files: List[str]) -> VectorDB:
     model = VectorDB()
     for pdf_file in pdf_files:
+        print("Procesing PDF:", pdf_file)
         elements = partition_pdf(pdf_file)
         content = "\n\n".join([e.text for e in elements])
         model.ingest(content=content)
